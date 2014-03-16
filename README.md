@@ -26,7 +26,7 @@ TEST_PROJECT_CLASSES_FOLDER: the folder where the new class DependencySuite.clas
 3- Run the instrumentation command with the option "-e class DependencySuite"
 e.g.: adb shell am instrument -w -e class DependencySuite com.android.foo/android.test.InstrumentationTestRunner
 
-A good place to run this command is in the target "-post-compile" of the test project, due to in this stage all the
+A good place to run this tool is in the target "-post-compile" of the test project, due to in this stage all the
 java files in the project and the test project were compiled.
 
 Known issues/limitations:
