@@ -31,3 +31,4 @@ java files in the project and the test project were compiled.
 
 Known issues/limitations:
 - to recognize a test it checks the class finishes with "Test"
+- hardcoded, the following packages and subpackages are ignored: "java", "android", "com", "org"
