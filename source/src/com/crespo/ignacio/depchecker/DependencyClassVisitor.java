@@ -9,26 +9,26 @@ import org.objectweb.asm.commons.InstructionAdapter;
 
 final class DependencyClassVisitor extends ClassVisitor {
 
-    final String mClassPath;
+    final ClassFile mClassPath;
+    private final DependencyChecker mChecker;
 
-    DependencyClassVisitor(final int arg0, final String classPath) {
+    DependencyClassVisitor(final int arg0, final ClassFile classPath, final DependencyChecker checker) {
         super(arg0);
         mClassPath = classPath;
+        mChecker = checker;
     }
 
     @Override
     public void visit(final int version, final int access, final String name, final String signature, final String superName,
             final String[] interfaces) {
-        if ((access & Opcodes.ACC_ABSTRACT) != 0) {
-            DepCheckerApp.addAbstractClass(mClassPath);
-        }
-        DepCheckerApp.setClassType(mClassPath, name);
-        DepCheckerApp.addUsage(mClassPath, AsmUtils.extractTypesFromDesc(signature));
-        DepCheckerApp.addUsage(mClassPath, superName);
-        DepCheckerApp.addSuperClass(mClassPath, superName);
+        mClassPath.setAccess(access);
+        mClassPath.setType(name);
+        mClassPath.addUsage(AsmUtils.extractTypesFromDesc(signature));
+        mClassPath.addUsage(superName);
+        mClassPath.setSuperType(superName);
         if (interfaces != null) {
             for (final String interf : interfaces) {
-                DepCheckerApp.addUsage(mClassPath, interf);
+                mClassPath.addUsage(interf);
             }
         }
         super.visit(version, access, name, signature, superName, interfaces);
@@ -36,24 +36,24 @@ final class DependencyClassVisitor extends ClassVisitor {
 
     @Override
     public AnnotationVisitor visitAnnotation(final String desc, final boolean visible) {
-        DepCheckerApp.addUsage(mClassPath, AsmUtils.extractTypesFromDesc(desc));
+        mClassPath.addUsage(AsmUtils.extractTypesFromDesc(desc));
         return super.visitAnnotation(desc, visible);
     }
 
     @Override
     public FieldVisitor visitField(final int access, final String name, final String desc, final String signature, final Object value) {
-        DepCheckerApp.addUsage(mClassPath, AsmUtils.extractTypesFromDesc(desc));
-        DepCheckerApp.addUsage(mClassPath, AsmUtils.extractTypesFromDesc(signature));
+        mClassPath.addUsage(AsmUtils.extractTypesFromDesc(desc));
+        mClassPath.addUsage(AsmUtils.extractTypesFromDesc(signature));
         return super.visitField(access, name, desc, signature, value);
     }
 
     @Override
     public MethodVisitor visitMethod(final int access, final String name, final String desc, final String signature, final String[] exceptions) {
-        DepCheckerApp.addUsage(mClassPath, AsmUtils.extractTypesFromDesc(desc));
-        DepCheckerApp.addUsage(mClassPath, AsmUtils.extractTypesFromDesc(signature));
+        mClassPath.addUsage(AsmUtils.extractTypesFromDesc(desc));
+        mClassPath.addUsage(AsmUtils.extractTypesFromDesc(signature));
         if (exceptions != null) {
             for (final String exc : exceptions) {
-                DepCheckerApp.addUsage(mClassPath, exc);
+                mClassPath.addUsage(exc);
             }
         }
         final MethodVisitor oriMv = new DependencyMethodVisitor(mClassPath, Opcodes.ASM4);
@@ -65,7 +65,8 @@ final class DependencyClassVisitor extends ClassVisitor {
 
     @Override
     public void visitSource(final String fileName, final String arg1) {
-        DepCheckerApp.addClassForSource(fileName, mClassPath);
+        mChecker.addClassForSource(fileName, mClassPath);
+        mClassPath.setSource(fileName);
         super.visitSource(fileName, arg1);
     }
 

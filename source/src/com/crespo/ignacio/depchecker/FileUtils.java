@@ -22,4 +22,8 @@ public class FileUtils {
         return classes;
     }
 
+    static boolean isJavaFile(final String filePath) {
+        return filePath.endsWith(".java") && filePath.indexOf('/') > 0;
+    }
+
 }

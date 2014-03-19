@@ -1,5 +1,7 @@
 package com.crespo.ignacio.depchecker;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.util.Set;
 
 import org.objectweb.asm.ClassWriter;
@@ -10,7 +12,7 @@ import org.objectweb.asm.Type;
 
 public class DependencySuiteDump implements Opcodes {
 
-    public static byte[] dump(final Set<String> testTypes) throws Exception {
+    public static byte[] dump(final Set<ClassFile> testTypes) throws Exception {
 
         final ClassWriter cw = new ClassWriter(0);
         MethodVisitor mv;
@@ -62,14 +64,14 @@ public class DependencySuiteDump implements Opcodes {
             if (testTypes.size() > 0) {
                 final Label firstLabel = new Label();
                 int c = 0;
-                for (final String type : testTypes) {
+                for (final ClassFile classFile : testTypes) {
                     if (c == 0) {
                         mv.visitLabel(firstLabel);
                     } else {
                         mv.visitLabel(new Label());
                     }
                     mv.visitVarInsn(ALOAD, 0);
-                    mv.visitLdcInsn(Type.getType("L" + type + ";"));
+                    mv.visitLdcInsn(Type.getType("L" + classFile.getBytecodeType() + ";"));
                     mv.visitMethodInsn(INVOKEVIRTUAL, "junit/framework/TestSuite", "addTestSuite", "(Ljava/lang/Class;)V");
                     c++;
                 }
@@ -93,5 +95,40 @@ public class DependencySuiteDump implements Opcodes {
         cw.visitEnd();
 
         return cw.toByteArray();
+    }
+
+    static void saveClassSuite(final Set<ClassFile> classesToRun, final String folder) {
+        FileOutputStream fos = null;
+        try {
+            fos = new FileOutputStream(new File(folder + File.separator + "DependencySuite.class"));
+            fos.write(dump(classesToRun));
+            System.out.println("");
+            System.out.println("File DependencySuite.class successfully created");
+        } catch (final Exception exc) {
+            exc.printStackTrace();
+        } finally {
+            StreamUtils.close(fos);
+        }
+    }
+
+    static void showJavaSuite(final Set<ClassFile> typesToRun) {
+        final StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append("public class DependencySuite extends junit.framework.TestSuite {\n");
+        stringBuilder.append("\n");
+        stringBuilder.append("    public static junit.framework.Test suite() {\n");
+        stringBuilder.append("        final junit.framework.TestSuite suite = new junit.framework.TestSuite();\n");
+        for (final ClassFile typeToRun : typesToRun) {
+            stringBuilder.append("        suite.addTestSuite(" + typeToRun.getType() + ".class);\n");
+        }
+        stringBuilder.append("        return suite;\n");
+        stringBuilder.append("    }\n");
+        stringBuilder.append("\n");
+        stringBuilder.append("}");
+        System.out.println(stringBuilder.toString());
+    }
+
+    static void dumpToFolder(final String folder, final Set<ClassFile> classesToRun) {
+        showJavaSuite(classesToRun);
+        saveClassSuite(classesToRun, folder);
     }
 }

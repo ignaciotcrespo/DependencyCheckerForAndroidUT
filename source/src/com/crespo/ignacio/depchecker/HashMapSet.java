@@ -1,5 +1,7 @@
 package com.crespo.ignacio.depchecker;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
@@ -29,6 +31,10 @@ public class HashMapSet<K, V> {
 
     public Set<K> keySet() {
         return new HashSet<K>(map.keySet());
+    }
+
+    public Collection<Set<V>> values() {
+        return new ArrayList<Set<V>>(map.values());
     }
 
 }
