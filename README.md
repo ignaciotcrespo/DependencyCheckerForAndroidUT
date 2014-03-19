@@ -1,5 +1,5 @@
-DependencyCheckerForAndroidUT
-=============================
+UTDependencyChecker
+===================
 
 Tool to run only the relevant UT based on the changes between two git branches
 
