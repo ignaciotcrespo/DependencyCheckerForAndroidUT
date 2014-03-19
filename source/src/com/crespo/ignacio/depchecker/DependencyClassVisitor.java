@@ -19,9 +19,13 @@ final class DependencyClassVisitor extends ClassVisitor {
     @Override
     public void visit(final int version, final int access, final String name, final String signature, final String superName,
             final String[] interfaces) {
+        if ((access & Opcodes.ACC_ABSTRACT) != 0) {
+            DepCheckerApp.addAbstractClass(mClassPath);
+        }
         DepCheckerApp.setClassType(mClassPath, name);
         DepCheckerApp.addUsage(mClassPath, AsmUtils.extractTypesFromDesc(signature));
         DepCheckerApp.addUsage(mClassPath, superName);
+        DepCheckerApp.addSuperClass(mClassPath, superName);
         if (interfaces != null) {
             for (final String interf : interfaces) {
                 DepCheckerApp.addUsage(mClassPath, interf);

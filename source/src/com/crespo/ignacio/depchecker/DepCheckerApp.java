@@ -11,6 +11,7 @@ import java.io.LineNumberReader;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Properties;
 import java.util.Set;
 
 import org.objectweb.asm.ClassReader;
@@ -19,13 +20,14 @@ import org.objectweb.asm.Opcodes;
 
 public class DepCheckerApp {
 
-    private static HashMap<String, Set<String>> sUsagesClasspathToType;
-    private static HashMap<String, Set<String>> sUsedByTyeToClasspath;
-    private static HashMap<String, Set<String>> sSourceToClasses;
-    private static HashMap<String, String> sClassesToSource;
-    private static HashMap<String, String> sClassToType;
-    private static HashMap<String, String> sTypeToClass;
+    private static HashMapSet<String, String> sUsagesClasspathToType;
+    private static HashMapSet<String, String> sSourceToClasses;
+    private static HashMap<String, String> sClassToSource;
+    private static DoubleHashMap<String, String> sClassToType;
     private static Set<String> sIgnoredPackages = new HashSet<String>();
+    private static Set<String> sTestBaseTypes = new HashSet<String>();
+    private static Set<String> sAbstractClasses = new HashSet<String>();
+    private static HashMap<String, String> sSuperTypeForClass = new HashMap<String, String>();
 
     protected static void addUsage(final String classPath, final String type) {
         if (type != null) {
@@ -36,37 +38,44 @@ public class DepCheckerApp {
                 }
             }
 
-            if (!sUsagesClasspathToType.containsKey(classPath)) {
-                sUsagesClasspathToType.put(classPath, new HashSet<String>());
-            }
-            if (sUsagesClasspathToType.get(classPath).add(type)) {
-                // add used by
-                if (!sUsedByTyeToClasspath.containsKey(type)) {
-                    sUsedByTyeToClasspath.put(type, new HashSet<String>());
-                }
-                sUsedByTyeToClasspath.get(type).add(classPath);
+            if (sUsagesClasspathToType.add(classPath, type)) {
+                // do nothing
             }
         }
     }
 
     public static void main(final String[] args) throws IOException {
+        final String paramFolderToSearchClasses = args[0];
+        final String paramFolderToSaveGeneratedClass = args[1];
 
-        addIgnoredPackages();
+        final Properties props = loadProperties();
+
+        addBaseTestClasses(props);
+        addIgnoredPackages(props);
         initialize();
 
-        processClassesinFolder(args[0]);
+        processClassesInFolderAndSubfolders(paramFolderToSearchClasses);
 
         generateClassesToSourceCollection();
 
-        final Set<String> sourcesToRun = getSourcesToRun();
+        final Set<String> classesToRun = getClassesToRun();
 
-        if (sourcesToRun.size() > 0) {
-            final Set<String> typesToRun = getTypesToRun(sourcesToRun);
-            showJavaSuite(typesToRun);
-            saveClassSuite(typesToRun, args[1]);
-        } else {
-            System.out.println("No UT to run!");
+        final Set<String> typesToRun = getTypesToRun(classesToRun);
+        showJavaSuite(typesToRun);
+        saveClassSuite(typesToRun, paramFolderToSaveGeneratedClass);
+    }
+
+    private static void addBaseTestClasses(final Properties props) {
+        final String[] values = getPropertyArray(props, "test.classes");
+        for (final String ignored : values) {
+            sTestBaseTypes.add(ignored);
         }
+    }
+
+    private static String[] getPropertyArray(final Properties props, final String name) {
+        final String value = props.getProperty(name);
+        final String[] values = value.split(",");
+        return values;
     }
 
     private static void saveClassSuite(final Set<String> typesToRun, final String folder) {
@@ -99,58 +108,104 @@ public class DepCheckerApp {
         System.out.println(stringBuilder.toString());
     }
 
-    private static Set<String> getTypesToRun(final Set<String> sourcesToRun) {
+    private static Set<String> getTypesToRun(final Set<String> classesToRun) {
         final Set<String> typesToRun = new HashSet<String>();
-        for (final String source : sourcesToRun) {
-            final Set<String> testClasses = sSourceToClasses.get(source);
-            for (final String testClass : testClasses) {
-                // avoid inner classes
-                if (testClass.indexOf('$') < 0) {
-                    typesToRun.add(sClassToType.get(testClass));
+        for (final String testClass : classesToRun) {
+            // avoid inner classes
+            if (testClass.indexOf('$') < 0) {
+                final String type = sClassToType.get(testClass);
+                if (type != null) {
+                    typesToRun.add(type);
                 }
             }
         }
         return typesToRun;
     }
 
-    private static Set<String> getSourcesToRun() throws IOException {
-        final Set<String> sourcesToRun = new HashSet<String>();
+    private static Set<String> getClassesToRun() throws IOException {
+        final Set<String> classesToRun = new HashSet<String>();
         final LineNumberReader lnr = new LineNumberReader(new InputStreamReader(System.in));
         String line;
         while (lnr.ready() && (line = lnr.readLine()) != null) {
             line = line.trim();
-            if (line.endsWith(".java") && line.indexOf('/') > 0) {
-                final String nameJavaToCheck = line.substring(line.lastIndexOf('/') + 1);
-                final Set<String> sources = sSourceToClasses.keySet();
-                for (final String source : sources) {
-                    if (source.endsWith("Test.java") && !sourcesToRun.contains(source)) {
-                        // search usage inside the test
-                        final Set<String> classesFromSource = sSourceToClasses.get(source);
-                        for (final String classFromSource : classesFromSource) {
-                            final boolean uses = classUsesSource(classFromSource, nameJavaToCheck);
-                            if (uses) {
-                                // run this test only!
-                                sourcesToRun.add(source);
-                                break;
-                            }
-                        }
+            if (isJavaFile(line)) {
+                analyzeDependenciesInJavaFileIfItIsTest(classesToRun, line);
+            }
+        }
+        return classesToRun;
+    }
+
+    private static void analyzeDependenciesInJavaFileIfItIsTest(final Set<String> classesToRun, final String filePath) {
+        final String sourceModified = filePath.substring(filePath.lastIndexOf('/') + 1);
+        // check all known sources, if they depend on this changed source
+        final Set<String> sources = sSourceToClasses.keySet();
+        for (final String source : sources) {
+            analyzeDependenciesInTestSource(classesToRun, sourceModified, source);
+        }
+    }
+
+    private static boolean isTest(final String clazz) {
+        return isTest(clazz, new HashSet<String>());
+    }
+
+    private static boolean isTest(final String clazz, final Set<String> checkedClasses) {
+        if (clazz == null) {
+            return false;
+        }
+        checkedClasses.add(clazz);
+        boolean isSuperATest = false;
+        if (sSuperTypeForClass.containsKey(clazz)) {
+            final String superType = sSuperTypeForClass.get(clazz);
+            for (final String testBaseType : sTestBaseTypes) {
+                if (superType.replace('/', '.').equals(testBaseType)) {
+                    isSuperATest = true;
+                    break;
+                }
+            }
+            if (!isSuperATest) {
+                final String superClass = sClassToType.getKeyFromValue(superType);
+                if (superClass != null) {
+                    if (!checkedClasses.contains(superClass)) {
+                        isSuperATest = isTest(superClass, checkedClasses);
                     }
                 }
             }
         }
-        return sourcesToRun;
+        return isSuperATest;
+    }
+
+    private static void analyzeDependenciesInTestSource(final Set<String> classesToRun, final String sourceModified, final String source) {
+        final Set<String> classesFromSource = sSourceToClasses.get(source);
+        for (final String classFromSource : classesFromSource) {
+            // only check test classes that are not abstract, and not already checked
+            if (!classesToRun.contains(classFromSource) && !isAbstract(classFromSource) && isTest(classFromSource)) {
+                if (classUsesSource(classFromSource, sourceModified)) {
+                    // run this test only!
+                    classesToRun.add(classFromSource);
+                    break;
+                }
+            }
+        }
+    }
+
+    private static boolean isAbstract(final String clazz) {
+        return sAbstractClasses.contains(clazz);
+    }
+
+    private static boolean isJavaFile(final String filePath) {
+        return filePath.endsWith(".java") && filePath.indexOf('/') > 0;
     }
 
     private static void generateClassesToSourceCollection() {
         for (final String source : sSourceToClasses.keySet()) {
             final Set<String> classesFromSource = sSourceToClasses.get(source);
             for (final String clazzFromSource : classesFromSource) {
-                sClassesToSource.put(clazzFromSource, source);
+                sClassToSource.put(clazzFromSource, source);
             }
         }
     }
 
-    private static void processClassesinFolder(final String folderPath) throws FileNotFoundException, IOException {
+    private static void processClassesInFolderAndSubfolders(final String folderPath) throws FileNotFoundException, IOException {
         final List<File> classes = FileUtils.findClassesInFolder(folderPath);
         for (final File classFile : classes) {
             final String classPath = classFile.getAbsolutePath();
@@ -159,22 +214,30 @@ public class DepCheckerApp {
     }
 
     private static void initialize() {
-        sSourceToClasses = new HashMap<String, Set<String>>();
-        sClassesToSource = new HashMap<String, String>();
-        sUsagesClasspathToType = new HashMap<String, Set<String>>();
-        sUsedByTyeToClasspath = new HashMap<String, Set<String>>();
-        sClassToType = new HashMap<String, String>();
-        sTypeToClass = new HashMap<String, String>();
+        sSourceToClasses = new HashMapSet<String, String>();
+        sClassToSource = new HashMap<String, String>();
+        sUsagesClasspathToType = new HashMapSet<String, String>();
+        sClassToType = new DoubleHashMap<String, String>();
     }
 
-    private static void addIgnoredPackages() {
-        sIgnoredPackages.add("java/");
-        sIgnoredPackages.add("android/");
-        sIgnoredPackages.add("com/");
-        sIgnoredPackages.add("org/");
+    private static void addIgnoredPackages(final Properties props) {
+        final String[] values = getPropertyArray(props, "ignored.packages");
+        for (final String ignored : values) {
+            if (ignored.endsWith("/")) {
+                sTestBaseTypes.add(ignored);
+            } else {
+                sTestBaseTypes.add(ignored + "/");
+            }
+        }
     }
 
     public static boolean classUsesSource(final String clazz, final String source) {
+        if (sClassToSource.containsKey(clazz)) {
+            if (sClassToSource.get(clazz).equals(source)) {
+                // the source belongs to the same class
+                return true;
+            }
+        }
         return classUsesSource(clazz, source, new HashSet<String>());
     }
 
@@ -186,25 +249,19 @@ public class DepCheckerApp {
         }
         analyzedClasses.add(clazz);
         final Set<String> usages = sUsagesClasspathToType.get(clazz);
-        if (usages != null) {
-            first: for (final String usedType : usages) {
-                final Set<String> classesFromSource = sSourceToClasses.get(source);
-                if (classesFromSource != null) {
-                    for (final String classFromSource : classesFromSource) {
-                        final String typeFromClass = sClassToType.get(classFromSource);
-                        if (usedType.equals(typeFromClass)) {
-                            uses = true;
-                            break first;
-                        } else {
-                            // search children
-                            final String classFromUsedType = sTypeToClass.get(usedType);
-                            uses = classUsesSource(classFromUsedType, source, analyzedClasses);
-                            if (uses) {
-                                // System.out.println("<- " + usedType);
-                                break;
-                            }
-                        }
-                    }
+        first: for (final String usedType : usages) {
+            final Set<String> classesFromSource = sSourceToClasses.get(source);
+            for (final String classFromSource : classesFromSource) {
+                final String typeFromClass = sClassToType.get(classFromSource);
+                if (usedType.equals(typeFromClass)) {
+                    uses = true;
+                    break first;
+                }
+                // search children
+                final String classFromUsedType = sClassToType.getKeyFromValue(usedType);
+                uses = classUsesSource(classFromUsedType, source, analyzedClasses);
+                if (uses) {
+                    break first;
                 }
             }
         }
@@ -226,15 +283,26 @@ public class DepCheckerApp {
 
     public static void setClassType(final String classPath, final String type) {
         sClassToType.put(classPath, type);
-        sTypeToClass.put(type, classPath);
     }
 
     public static void addClassForSource(final String source, final String classPath) {
-        if (!sSourceToClasses.containsKey(source)) {
-            sSourceToClasses.put(source, new HashSet<String>());
-        }
-        if (sSourceToClasses.get(source).add(classPath)) {
+        if (sSourceToClasses.add(source, classPath)) {
             // do nothing
         }
     }
+
+    public static void addAbstractClass(final String classPath) {
+        sAbstractClasses.add(classPath);
+    }
+
+    public static void addSuperClass(final String classPath, final String superName) {
+        sSuperTypeForClass.put(classPath, superName);
+    }
+
+    private static Properties loadProperties() throws FileNotFoundException, IOException {
+        final Properties props = new Properties();
+        props.load(new FileInputStream("dependency.properties"));
+        return props;
+    }
+
 }
