@@ -100,10 +100,13 @@ public class DependencySuiteDump implements Opcodes {
     static void saveClassSuite(final Set<ClassFile> classesToRun, final String folder) {
         FileOutputStream fos = null;
         try {
-            fos = new FileOutputStream(new File(folder + File.separator + "DependencySuite.class"));
+            File file = new File(folder + File.separator + "DependencySuite.class");
+            fos = new FileOutputStream(file);
             fos.write(dump(classesToRun));
+            System.out.println("----------------------------");
+            System.out.println("TestSuite created: "+ file);
+            System.out.println("----------------------------");
             System.out.println("");
-            System.out.println("File DependencySuite.class successfully created");
         } catch (final Exception exc) {
             exc.printStackTrace();
         } finally {

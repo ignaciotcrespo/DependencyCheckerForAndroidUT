@@ -35,15 +35,19 @@ public class DependencyChecker {
     }
 
     private Set<ClassFile> getClassesToRun() throws IOException {
+        System.out.println("Classes to analyze");
+        System.out.println("------------------");
         final Set<ClassFile> classesToRun = new HashSet<ClassFile>();
         final LineNumberReader lnr = new LineNumberReader(new InputStreamReader(System.in));
         String line;
         while (lnr.ready() && (line = lnr.readLine()) != null) {
             line = line.trim();
+            System.out.println("Modified class: "+ line);
             if (FileUtils.isJavaFile(line)) {
                 analyzeDependenciesInJavaFileIfItIsTest(classesToRun, line);
             }
         }
+        System.out.println("------------------");
         return classesToRun;
     }
 
@@ -62,6 +66,7 @@ public class DependencyChecker {
             if (!classesToRun.contains(classFromSource) && !classFromSource.isAbstract() && ClassFileUtils.isTest(classFromSource)) {
                 if (classUsesSource(classFromSource, sourceModified)) {
                     // run this test only!
+                    System.out.println("   Test found: "+ classFromSource);
                     classesToRun.add(classFromSource);
                     break;
                 }
