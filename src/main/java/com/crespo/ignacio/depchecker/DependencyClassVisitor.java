@@ -65,7 +65,6 @@ final class DependencyClassVisitor extends ClassVisitor {
 
     @Override
     public void visitSource(final String fileName, final String arg1) {
-        System.out.println("add class for source: "+ fileName +" "+ mClassPath.toString());
         mChecker.addClassForSource(fileName, mClassPath);
         mClassPath.setSource(fileName);
         super.visitSource(fileName, arg1);

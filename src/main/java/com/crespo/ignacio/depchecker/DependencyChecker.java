@@ -37,14 +37,18 @@ public class DependencyChecker {
     private Set<ClassFile> getClassesToRun() throws IOException {
         System.out.println("Classes to analyze");
         System.out.println("------------------");
-        final Set<ClassFile> classesToRun = new HashSet<ClassFile>();
+        final Set<String> lines = new HashSet<>();
+        final Set<ClassFile> classesToRun = new HashSet<>();
         final LineNumberReader lnr = new LineNumberReader(new InputStreamReader(System.in));
         String line;
         while (lnr.ready() && (line = lnr.readLine()) != null) {
             line = line.trim();
-            System.out.println("Modified class: "+ line);
-            if (FileUtils.isJavaFile(line)) {
-                analyzeDependenciesInJavaFileIfItIsTest(classesToRun, line);
+            lines.add(line);
+        }
+        for (String singleLine : lines) {
+            System.out.println("Modified class: " + singleLine);
+            if (FileUtils.isJavaFile(singleLine)) {
+                analyzeDependenciesInJavaFileIfItIsTest(classesToRun, singleLine);
             }
         }
         System.out.println("------------------");
@@ -63,11 +67,16 @@ public class DependencyChecker {
     private void analyzeDependenciesInTestSource(final Set<ClassFile> classesToRun, final String sourceModified, final Set<ClassFile> classesPerSource) {
         for (final ClassFile classFromSource : classesPerSource) {
             // only check test classes that are not abstract, and not already checked
-            if (!classesToRun.contains(classFromSource) && !classFromSource.isAbstract() && ClassFileUtils.isTest(classFromSource)) {
+            if (!classFromSource.isAbstract() && ClassFileUtils.isTest(classFromSource)) {
                 if (classUsesSource(classFromSource, sourceModified)) {
                     // run this test only!
-                    System.out.println("   Test found: "+ classFromSource);
-                    classesToRun.add(classFromSource);
+                    if (!classesToRun.contains(classFromSource)) {
+                        classesToRun.add(classFromSource);
+                        System.out.print("   [*] ");
+                    } else {
+                        System.out.print("   [ ] ");
+                    }
+                    System.out.println("Test found: " + classFromSource);
                     break;
                 }
             }
@@ -114,7 +123,8 @@ public class DependencyChecker {
         boolean uses = false;
         analyzedClasses.add(clazz);
         final Set<String> usages = clazz.getUsedClasses();
-        first: for (final String usedType : usages) {
+        first:
+        for (final String usedType : usages) {
             final Set<ClassFile> classesFromSource = mSourceToClasses.get(source);
             for (final ClassFile classFromSource : classesFromSource) {
                 final String typeFromClass = classFromSource.getType();
