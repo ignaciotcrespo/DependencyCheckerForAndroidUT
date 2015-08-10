@@ -1,0 +1,1 @@
+git log --name-only --pretty=%n devel..HEAD | grep .java | java -jar build/libs/dcheckut-1.0-SNAPSHOT.jar . .

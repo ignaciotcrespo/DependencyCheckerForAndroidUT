@@ -46,12 +46,13 @@ public class DependencyChecker {
             lines.add(line);
         }
         for (String singleLine : lines) {
+            System.out.println("----------------------------------------------------------------------------------------");
             System.out.println("Modified class: " + singleLine);
             if (FileUtils.isJavaFile(singleLine)) {
                 analyzeDependenciesInJavaFileIfItIsTest(classesToRun, singleLine);
             }
         }
-        System.out.println("------------------");
+        System.out.println("----------------------------------------------------------------------------------------");
         return classesToRun;
     }
 

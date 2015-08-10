@@ -10,13 +10,17 @@ public class PropertiesUtils {
 
     static String[] getPropertyArray(final Properties props, final String name) {
         final String value = props.getProperty(name);
-        final String[] values = value.split(",");
-        return values;
+        if (value != null) {
+            return value.split(",");
+        }
+        return new String[]{};
     }
 
     static Properties loadProperties(final File file) throws FileNotFoundException, IOException {
         final Properties props = new Properties();
-        props.load(new FileInputStream(file));
+        if (file.exists()) {
+            props.load(new FileInputStream(file));
+        }
         return props;
     }
 

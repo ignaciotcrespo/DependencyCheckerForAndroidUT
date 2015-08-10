@@ -17,15 +17,32 @@ public class ClassFileUtils {
 
     private static void addBaseTestClasses(final Properties props) {
         final String[] values = PropertiesUtils.getPropertyArray(props, "test.classes");
-        for (final String ignored : values) {
-            sTestBaseTypes.add(ignored);
+        if (values.length > 0) {
+            for (final String ignored : values) {
+                sTestBaseTypes.add(ignored);
+            }
+        } else {
+            System.out.println("Property 'test.classes' not found, using default: test.classes=junit.framework.TestCase,android.test.AndroidTestCase,android.test.InstrumentationTestCase");
+            System.out.println("----------------------------------------------------------------------------------------");
+            sTestBaseTypes.add("junit.framework.TestCase");
+            sTestBaseTypes.add("android.test.AndroidTestCase");
+            sTestBaseTypes.add("android.test.InstrumentationTestCase");
         }
     }
 
     private static void addIgnoredPackages(final Properties props) {
         final String[] values = PropertiesUtils.getPropertyArray(props, "ignored.packages");
-        for (final String ignored : values) {
-            ClassFileUtils.sIgnoredPackages.add(ignored);
+        if (values.length > 0) {
+            for (final String ignored : values) {
+                ClassFileUtils.sIgnoredPackages.add(ignored);
+            }
+        } else {
+            System.out.println("Property 'ignored.packages' not found, using default: ignored.packages=java,android,com,org");
+            System.out.println("----------------------------------------------------------------------------------------");
+            ClassFileUtils.sIgnoredPackages.add("java");
+            ClassFileUtils.sIgnoredPackages.add("android");
+            ClassFileUtils.sIgnoredPackages.add("com");
+            ClassFileUtils.sIgnoredPackages.add("org");
         }
     }
 
