@@ -1,37 +1,94 @@
 package com.crespo.ignacio.depchecker;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Objects.ToStringHelper;
 import com.google.common.base.Optional;
+import org.objectweb.asm.tree.MethodNode;
 
 public class ClassFile {
 
     private final ClassNode mNode;
     Set<String> mUsedClasses = new HashSet<String>();
     private final File mClassFile;
+    private boolean mIsTest;
 
     public ClassFile(final File file) {
         mClassFile = file;
         mNode = new ClassNode(Opcodes.ASM4);
+        try {
+            ClassReader cr = new ClassReader(new FileInputStream(file));
+            cr.accept(mNode, 0);
+
+            ClassFileUtils.putType(mNode.name.replace('/', '.'), this);
+
+            checkTest();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
-    public boolean isAbstract() {
-        return (mNode.access & Opcodes.ACC_ABSTRACT) != 0;
+    private void checkTest() {
+        mIsTest = false;
+        boolean isAbstract = (mNode.access & Opcodes.ACC_ABSTRACT) != 0;
+        if (!isAbstract) {
+            //check if there is a method starting with "test"
+            for (Object mtd : mNode.methods) {
+                MethodNode method = (MethodNode) mtd;
+                boolean isPrivate = (method.access & Opcodes.ACC_PRIVATE) != 0;
+                if (!isPrivate) {
+                    // check annotations
+                    if (method.invisibleAnnotations != null) {
+                        for (Object ann : method.invisibleAnnotations) {
+                            AnnotationNode annotation = (AnnotationNode) ann;
+                            Set<String> types = AsmUtils.extractTypesFromDesc(annotation.desc);
+                            boolean annotatedTest = types.contains("org/junit/Test");
+                            if (annotatedTest) {
+                                mIsTest = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!mIsTest) {
+                        // check annotations
+                        if (method.visibleAnnotations != null) {
+                            for (Object ann : method.visibleAnnotations) {
+                                AnnotationNode annotation = (AnnotationNode) ann;
+                                Set<String> types = AsmUtils.extractTypesFromDesc(annotation.desc);
+                                boolean annotatedTest = types.contains("org/junit/Test");
+                                if (annotatedTest) {
+                                    mIsTest = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                    }
+                    if (!mIsTest) {
+                        boolean namedTest = method.name.startsWith("test");
+                        if (namedTest) {
+                            mIsTest = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     public String getSource() {
         return mNode.sourceFile;
-    }
-
-    public Optional<String> getSuperType() {
-        return Optional.fromNullable(mNode.superName);
     }
 
     public boolean addUsage(final String type) {
@@ -42,28 +99,19 @@ public class ClassFile {
     }
 
     public String getType() {
-        return mNode.name;
+        return mNode.name.replace('/', '.');
     }
 
     public String getBytecodeType() {
-        return mNode.name.replace('.', '/');
+        return mNode.name;
     }
 
     public Set<String> getUsedClasses() {
-        return new HashSet<String>(mUsedClasses);
-    }
-
-    public void setAccess(final int access) {
-        mNode.access = access;
+        return new HashSet<>(mUsedClasses);
     }
 
     public File getClassFile() {
         return mClassFile;
-    }
-
-    public void setType(final String type) {
-        mNode.name = type.replace('/', '.');
-        ClassFileUtils.putType(mNode.name, this);
     }
 
     public void addUsage(final Set<String> typesFromDesc) {
@@ -72,21 +120,14 @@ public class ClassFile {
         }
     }
 
-    public void setSuperType(final String type) {
-        // dont ignore here
-        if (type != null) {
-            mNode.superName = type.replace('/', '.');
-        }
-    }
-
-    public void setSource(final String source) {
-        mNode.sourceFile = source;
-    }
-
     @Override
     public String toString() {
         final ToStringHelper helper = Objects.toStringHelper(getClass());
         helper.add("file", mClassFile);
         return helper.toString();
+    }
+
+    public boolean isTest() {
+        return mIsTest;
     }
 }

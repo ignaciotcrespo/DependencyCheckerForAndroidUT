@@ -72,23 +72,24 @@ public class ClassFileUtils {
         }
         checkedClasses.add(clazz);
         boolean isSuperATest = false;
-        final Optional<String> superType = clazz.getSuperType();
-        if (superType.isPresent()) {
-            for (final String testBaseType : sTestBaseTypes) {
-                if (superType.get().equals(testBaseType)) {
-                    isSuperATest = true;
-                    break;
-                }
-            }
-            if (!isSuperATest) {
-                final ClassFile superClass = ClassFileUtils.sTypeToClass.get(superType.get());
-                if (superClass != null) {
-                    if (!checkedClasses.contains(superClass)) {
-                        isSuperATest = isTest(superClass, checkedClasses);
-                    }
-                }
-            }
-        }
+        isSuperATest = clazz.isTest();
+//        final Optional<String> superType = clazz.getSuperType();
+//        if (superType.isPresent()) {
+//            for (final String testBaseType : sTestBaseTypes) {
+//                if (superType.get().equals(testBaseType)) {
+//                    isSuperATest = !clazz.isAbstract();
+//                    break;
+//                }
+//            }
+//            if (!isSuperATest) {
+//                final ClassFile superClass = ClassFileUtils.sTypeToClass.get(superType.get());
+//                if (superClass != null) {
+//                    if (!checkedClasses.contains(superClass)) {
+//                        isSuperATest = isTest(superClass, checkedClasses);
+//                    }
+//                }
+//            }
+//        }
         return isSuperATest;
     }
 

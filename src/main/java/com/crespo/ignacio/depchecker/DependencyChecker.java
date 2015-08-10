@@ -31,6 +31,13 @@ public class DependencyChecker {
 
         final Set<ClassFile> classesToRun = getClassesToRun();
 
+        if(classesToRun.isEmpty()){
+            System.out.println("-------------------------------------");
+            System.out.println("No tests found to run, exiting with 2");
+            System.out.println("-------------------------------------");
+            System.exit(2);
+        }
+
         DependencySuiteDump.dumpToFolder(folderToSaveGeneratedClass, classesToRun);
     }
 
@@ -43,7 +50,15 @@ public class DependencyChecker {
         String line;
         while (lnr.ready() && (line = lnr.readLine()) != null) {
             line = line.trim();
-            lines.add(line);
+            if (!line.isEmpty() && line.endsWith(".java")) {
+                lines.add(line);
+            }
+        }
+        if(lines.isEmpty()){
+            System.out.println("----------------------------------------");
+            System.out.println("Not .java files modified, exiting with 1");
+            System.out.println("----------------------------------------");
+            System.exit(1);
         }
         for (String singleLine : lines) {
             System.out.println("----------------------------------------------------------------------------------------");
@@ -68,7 +83,7 @@ public class DependencyChecker {
     private void analyzeDependenciesInTestSource(final Set<ClassFile> classesToRun, final String sourceModified, final Set<ClassFile> classesPerSource) {
         for (final ClassFile classFromSource : classesPerSource) {
             // only check test classes that are not abstract, and not already checked
-            if (!classFromSource.isAbstract() && ClassFileUtils.isTest(classFromSource)) {
+            if (ClassFileUtils.isTest(classFromSource)) {
                 if (classUsesSource(classFromSource, sourceModified)) {
                     // run this test only!
                     if (!classesToRun.contains(classFromSource)) {
@@ -100,8 +115,14 @@ public class DependencyChecker {
     }
 
     private void initialize() throws FileNotFoundException, IOException {
-        mSourceToClasses = new HashMapSet<String, ClassFile>();
-        final Properties props = PropertiesUtils.loadProperties(new File("dependency.properties"));
+        mSourceToClasses = new HashMapSet<>();
+        File file = new File("dependency.properties");
+        if (!file.exists()) {
+            System.out.println("----------------------------------------------");
+            System.out.println("dependency.properties not found! Using default");
+            System.out.println("----------------------------------------------");
+        }
+        final Properties props = PropertiesUtils.loadProperties(file);
         ClassFileUtils.initialize(props);
     }
 

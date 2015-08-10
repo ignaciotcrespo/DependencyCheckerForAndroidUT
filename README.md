@@ -32,5 +32,5 @@ A good place to run this tool is in the target "-post-compile" of the test proje
 java files in the project and the test project were compiled.
 
 Known issues/limitations:
-- to recognize a test it checks the class finishes with "Test"
+- to recognize a test it checks the class is not abstract, has at least one method annotated with @Test, or at least one method named "testXXX"
 - hardcoded, the following packages and subpackages are ignored: "java", "android", "com", "org"

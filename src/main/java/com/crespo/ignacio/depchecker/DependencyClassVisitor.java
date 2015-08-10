@@ -21,11 +21,8 @@ final class DependencyClassVisitor extends ClassVisitor {
     @Override
     public void visit(final int version, final int access, final String name, final String signature, final String superName,
             final String[] interfaces) {
-        mClassPath.setAccess(access);
-        mClassPath.setType(name);
         mClassPath.addUsage(AsmUtils.extractTypesFromDesc(signature));
         mClassPath.addUsage(superName);
-        mClassPath.setSuperType(superName);
         if (interfaces != null) {
             for (final String interf : interfaces) {
                 mClassPath.addUsage(interf);
@@ -66,7 +63,6 @@ final class DependencyClassVisitor extends ClassVisitor {
     @Override
     public void visitSource(final String fileName, final String arg1) {
         mChecker.addClassForSource(fileName, mClassPath);
-        mClassPath.setSource(fileName);
         super.visitSource(fileName, arg1);
     }
 
