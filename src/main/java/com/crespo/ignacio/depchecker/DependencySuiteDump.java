@@ -104,7 +104,7 @@ public class DependencySuiteDump implements Opcodes {
             fos = new FileOutputStream(file);
             fos.write(dump(classesToRun));
             System.out.println("----------------------------");
-            System.out.println("TestSuite created: "+ file);
+            System.out.println("TestSuite created: "+ file.getAbsolutePath());
             System.out.println("----------------------------");
             System.out.println("");
         } catch (final Exception exc) {
