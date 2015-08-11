@@ -16,7 +16,7 @@ import com.google.common.base.Objects.ToStringHelper;
 import com.google.common.base.Optional;
 import org.objectweb.asm.tree.MethodNode;
 
-public class ClassFile {
+public class ClassFile implements Comparable<ClassFile>{
 
     private final ClassNode mNode;
     Set<String> mUsedClasses = new HashSet<String>();
@@ -148,5 +148,10 @@ public class ClassFile {
     @Override
     public int hashCode() {
         return mClassFile.hashCode();
+    }
+
+    @Override
+    public int compareTo(ClassFile other) {
+        return this.getType().compareTo(other.getType());
     }
 }

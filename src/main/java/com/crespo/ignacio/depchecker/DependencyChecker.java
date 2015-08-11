@@ -67,6 +67,7 @@ public class DependencyChecker {
     }
 
     private void analyzeDependenciesInJavaFileIfItIsTest(final Set<ClassFile> classesToRun, final String javaFilePath) {
+        previousTree.clear();
         final String sourceModified = javaFilePath.substring(javaFilePath.lastIndexOf('/') + 1);
         // check all known sources, if they depend on this changed source
         final Collection<Set<ClassFile>> allClassesPerSource = mSourceToClasses.values();
@@ -75,14 +76,51 @@ public class DependencyChecker {
         }
     }
 
+    ArrayList<String> previousTree = new ArrayList<>();
+
     private void analyzeDependenciesInTestSource(final Set<ClassFile> classesToRun, final String sourceModified, final Set<ClassFile> classesPerSource) {
         for (final ClassFile classFromSource : classesPerSource) {
             // only check test classes that are not abstract, and not already checked
             if (classFromSource.isTest()) {
-                if (classUsesSource(classFromSource, sourceModified)) {
+                ArrayList<String> tree = new ArrayList<>();
+                if (classUsesSource(classFromSource, sourceModified, tree)) {
+
+
                     // run this test only!
                     if (!classesToRun.contains(classFromSource)) {
                         classesToRun.add(classFromSource);
+
+
+                        for (int i = 0; i < tree.size(); i++) {
+                            String previous = previousTree.size() > i ? previousTree.get(i) : "";
+                            if (!previous.equals(tree.get(i))) {
+                                System.out.print("     ");
+                                for (int j = 0; j < i; j++) {
+                                    System.out.print("|    ");
+                                }
+                                if(i == tree.size()-1){
+                                    System.out.print("^-------[ ");
+                                } else {
+                                    System.out.print("^----* ");
+                                }
+                                System.out.print(tree.get(i));
+                                if(i == tree.size()-1){
+                                    System.out.println(" ]-------");
+                                } else {
+                                    System.out.println("");
+                                }
+                            }
+                        }
+                        System.out.print("     ");
+                        for (int i = 0; i < tree.size(); i++) {
+                            System.out.print("|    ");
+                        }
+                        System.out.println("");
+
+                        previousTree.clear();
+                        previousTree.addAll(tree);
+
+
 //                        System.out.print("   [*] ");
                     } else {
 //                        System.out.print("   [ ] ");
@@ -119,25 +157,12 @@ public class DependencyChecker {
         ClassFileUtils.initialize(props);
     }
 
-    private boolean classUsesSource(final ClassFile clazz, final String source) {
+    private boolean classUsesSource(final ClassFile clazz, final String source, ArrayList<String> tree) {
         if (clazz.getSource().equals(source)) {
             // the source belongs to the same class
             return true;
         }
-        HashSet<ClassFile> analyzedClasses = new HashSet<>();
-        ArrayList<String> tree = new ArrayList<>();
-        boolean uses = classUsesSource(clazz, source, analyzedClasses, tree);
-        if(uses){
-            for (int i = 0; i < tree.size(); i++) {
-                for (int j = 0; j < i; j++) {
-                    System.out.print("      ");
-                }
-                System.out.print("   ^----");
-                System.out.println(tree.get(i));
-            }
-            System.out.println("");
-        }
-        return uses;
+        return classUsesSource(clazz, source, new HashSet<ClassFile>(), tree);
     }
 
     private boolean classUsesSource(final ClassFile clazz, final String source, final Set<ClassFile> analyzedClasses, List<String> tree) {
@@ -178,7 +203,7 @@ public class DependencyChecker {
                 }
             }
         }
-        if (uses){
+        if (uses) {
             tree.add(clazz.getType());
         }
         return uses;
