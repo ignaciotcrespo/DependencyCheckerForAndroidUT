@@ -103,9 +103,7 @@ public class DependencySuiteDump implements Opcodes {
             File file = new File(folder + File.separator + "DependencySuite.class");
             fos = new FileOutputStream(file);
             fos.write(dump(classesToRun));
-            System.out.println("----------------------------");
-            System.out.println("TestSuite created: "+ file.getAbsolutePath());
-            System.out.println("----------------------------");
+            Console.log("TestSuite created: " + file.getAbsolutePath());
             System.out.println("");
         } catch (final Exception exc) {
             exc.printStackTrace();
@@ -127,7 +125,7 @@ public class DependencySuiteDump implements Opcodes {
         stringBuilder.append("    }\n");
         stringBuilder.append("\n");
         stringBuilder.append("}");
-        System.out.println(stringBuilder.toString());
+        Console.log(stringBuilder.toString());
     }
 
     static void dumpToFolder(final String folder, final Set<ClassFile> classesToRun) {

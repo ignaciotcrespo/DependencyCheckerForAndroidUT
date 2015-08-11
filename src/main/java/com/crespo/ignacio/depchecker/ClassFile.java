@@ -92,6 +92,9 @@ public class ClassFile {
     }
 
     public boolean addUsage(final String type) {
+        if(mNode.name.equals(type)){
+            return false;
+        }
         if (!ClassFileUtils.isIgnored(type)) {
             return mUsedClasses.add(type.replace('/', '.'));
         }
@@ -129,5 +132,21 @@ public class ClassFile {
 
     public boolean isTest() {
         return mIsTest;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        ClassFile classFile = (ClassFile) o;
+
+        return mClassFile.equals(classFile.mClassFile);
+
+    }
+
+    @Override
+    public int hashCode() {
+        return mClassFile.hashCode();
     }
 }

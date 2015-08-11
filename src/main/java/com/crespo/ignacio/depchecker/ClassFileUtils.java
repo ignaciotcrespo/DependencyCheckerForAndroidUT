@@ -5,8 +5,6 @@ import java.util.HashSet;
 import java.util.Properties;
 import java.util.Set;
 
-import com.google.common.base.Optional;
-
 public class ClassFileUtils {
 
     private static Set<String> sTestBaseTypes = new HashSet<String>();
@@ -22,8 +20,7 @@ public class ClassFileUtils {
                 sTestBaseTypes.add(ignored);
             }
         } else {
-            System.out.println("Property 'test.classes' not found, using default: test.classes=junit.framework.TestCase,android.test.AndroidTestCase,android.test.InstrumentationTestCase");
-            System.out.println("----------------------------------------------------------------------------------------");
+            Console.log("Property 'test.classes' not found, using default: test.classes=junit.framework.TestCase,android.test.AndroidTestCase,android.test.InstrumentationTestCase");
             sTestBaseTypes.add("junit.framework.TestCase");
             sTestBaseTypes.add("android.test.AndroidTestCase");
             sTestBaseTypes.add("android.test.InstrumentationTestCase");
@@ -37,8 +34,7 @@ public class ClassFileUtils {
                 ClassFileUtils.sIgnoredPackages.add(ignored);
             }
         } else {
-            System.out.println("Property 'ignored.packages' not found, using default: ignored.packages=java,android,com,org");
-            System.out.println("----------------------------------------------------------------------------------------");
+            Console.log("Property 'ignored.packages' not found, using default: ignored.packages=java,android,com,org");
             ClassFileUtils.sIgnoredPackages.add("java");
             ClassFileUtils.sIgnoredPackages.add("android");
             ClassFileUtils.sIgnoredPackages.add("com");
@@ -59,38 +55,6 @@ public class ClassFileUtils {
             }
         }
         return ignore;
-    }
-
-    static boolean isTest(final ClassFile clazz) {
-        final boolean is = ClassFileUtils.isTest(clazz, new HashSet<ClassFile>());
-        return is;
-    }
-
-    static boolean isTest(final ClassFile clazz, final Set<ClassFile> checkedClasses) {
-        if (clazz == null) {
-            return false;
-        }
-        checkedClasses.add(clazz);
-        boolean isSuperATest = false;
-        isSuperATest = clazz.isTest();
-//        final Optional<String> superType = clazz.getSuperType();
-//        if (superType.isPresent()) {
-//            for (final String testBaseType : sTestBaseTypes) {
-//                if (superType.get().equals(testBaseType)) {
-//                    isSuperATest = !clazz.isAbstract();
-//                    break;
-//                }
-//            }
-//            if (!isSuperATest) {
-//                final ClassFile superClass = ClassFileUtils.sTypeToClass.get(superType.get());
-//                if (superClass != null) {
-//                    if (!checkedClasses.contains(superClass)) {
-//                        isSuperATest = isTest(superClass, checkedClasses);
-//                    }
-//                }
-//            }
-//        }
-        return isSuperATest;
     }
 
     public static void putType(final String type, final ClassFile classFile) {

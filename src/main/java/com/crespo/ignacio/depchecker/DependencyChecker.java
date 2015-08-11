@@ -7,11 +7,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.LineNumberReader;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Properties;
-import java.util.Set;
+import java.util.*;
 
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
@@ -27,25 +23,34 @@ public class DependencyChecker {
     }
 
     private void process(final String folderToSearchClasses, final String folderToSaveGeneratedClass) throws FileNotFoundException, IOException {
+        final Set<String> lines = parseInputWithListOfSources();
+
         processClassesInFolderAndSubfolders(folderToSearchClasses);
 
-        final Set<ClassFile> classesToRun = getClassesToRun();
+        final Set<ClassFile> classesToRun = getClassesToRun(lines);
 
-        if(classesToRun.isEmpty()){
-            System.out.println("-------------------------------------");
-            System.out.println("No tests found to run, exiting with 2");
-            System.out.println("-------------------------------------");
+        if (classesToRun.isEmpty()) {
+            Console.log("No tests found to run, exiting with 2");
             System.exit(2);
         }
 
         DependencySuiteDump.dumpToFolder(folderToSaveGeneratedClass, classesToRun);
     }
 
-    private Set<ClassFile> getClassesToRun() throws IOException {
-        System.out.println("Classes to analyze");
-        System.out.println("------------------");
-        final Set<String> lines = new HashSet<>();
+    private Set<ClassFile> getClassesToRun(Set<String> lines) throws IOException {
         final Set<ClassFile> classesToRun = new HashSet<>();
+        for (String singleLine : lines) {
+            Console.log("Modified class: " + singleLine);
+            if (FileUtils.isJavaFile(singleLine)) {
+                analyzeDependenciesInJavaFileIfItIsTest(classesToRun, singleLine);
+            }
+        }
+        return classesToRun;
+    }
+
+    private Set<String> parseInputWithListOfSources() throws IOException {
+        Console.log("Analyzing classes, searching for tests...");
+        final Set<String> lines = new HashSet<>();
         final LineNumberReader lnr = new LineNumberReader(new InputStreamReader(System.in));
         String line;
         while (lnr.ready() && (line = lnr.readLine()) != null) {
@@ -54,21 +59,11 @@ public class DependencyChecker {
                 lines.add(line);
             }
         }
-        if(lines.isEmpty()){
-            System.out.println("----------------------------------------");
-            System.out.println("Not .java files modified, exiting with 1");
-            System.out.println("----------------------------------------");
+        if (lines.isEmpty()) {
+            Console.log("Not .java files modified, exiting with 1");
             System.exit(1);
         }
-        for (String singleLine : lines) {
-            System.out.println("----------------------------------------------------------------------------------------");
-            System.out.println("Modified class: " + singleLine);
-            if (FileUtils.isJavaFile(singleLine)) {
-                analyzeDependenciesInJavaFileIfItIsTest(classesToRun, singleLine);
-            }
-        }
-        System.out.println("----------------------------------------------------------------------------------------");
-        return classesToRun;
+        return lines;
     }
 
     private void analyzeDependenciesInJavaFileIfItIsTest(final Set<ClassFile> classesToRun, final String javaFilePath) {
@@ -83,16 +78,16 @@ public class DependencyChecker {
     private void analyzeDependenciesInTestSource(final Set<ClassFile> classesToRun, final String sourceModified, final Set<ClassFile> classesPerSource) {
         for (final ClassFile classFromSource : classesPerSource) {
             // only check test classes that are not abstract, and not already checked
-            if (ClassFileUtils.isTest(classFromSource)) {
+            if (classFromSource.isTest()) {
                 if (classUsesSource(classFromSource, sourceModified)) {
                     // run this test only!
                     if (!classesToRun.contains(classFromSource)) {
                         classesToRun.add(classFromSource);
-                        System.out.print("   [*] ");
+//                        System.out.print("   [*] ");
                     } else {
-                        System.out.print("   [ ] ");
+//                        System.out.print("   [ ] ");
                     }
-                    System.out.println("Test found: " + classFromSource);
+//                    System.out.println("Test found: " + classFromSource);
                     break;
                 }
             }
@@ -118,9 +113,7 @@ public class DependencyChecker {
         mSourceToClasses = new HashMapSet<>();
         File file = new File("dependency.properties");
         if (!file.exists()) {
-            System.out.println("----------------------------------------------");
-            System.out.println("dependency.properties not found! Using default");
-            System.out.println("----------------------------------------------");
+            Console.log("dependency.properties not found! Using default");
         }
         final Properties props = PropertiesUtils.loadProperties(file);
         ClassFileUtils.initialize(props);
@@ -131,10 +124,23 @@ public class DependencyChecker {
             // the source belongs to the same class
             return true;
         }
-        return classUsesSource(clazz, source, new HashSet<ClassFile>());
+        HashSet<ClassFile> analyzedClasses = new HashSet<>();
+        ArrayList<String> tree = new ArrayList<>();
+        boolean uses = classUsesSource(clazz, source, analyzedClasses, tree);
+        if(uses){
+            for (int i = 0; i < tree.size(); i++) {
+                for (int j = 0; j < i; j++) {
+                    System.out.print("      ");
+                }
+                System.out.print("   ^----");
+                System.out.println(tree.get(i));
+            }
+            System.out.println("");
+        }
+        return uses;
     }
 
-    private boolean classUsesSource(final ClassFile clazz, final String source, final Set<ClassFile> analyzedClasses) {
+    private boolean classUsesSource(final ClassFile clazz, final String source, final Set<ClassFile> analyzedClasses, List<String> tree) {
         if (clazz == null) {
             return false;
         }
@@ -144,23 +150,36 @@ public class DependencyChecker {
         }
         boolean uses = false;
         analyzedClasses.add(clazz);
-        final Set<String> usages = clazz.getUsedClasses();
-        first:
-        for (final String usedType : usages) {
-            final Set<ClassFile> classesFromSource = mSourceToClasses.get(source);
-            for (final ClassFile classFromSource : classesFromSource) {
-                final String typeFromClass = classFromSource.getType();
-                if (usedType.equals(typeFromClass)) {
-                    uses = true;
-                    break first;
-                }
-                // search children
-                final ClassFile classFromUsedType = ClassFileUtils.getFromType(usedType);
-                uses = classUsesSource(classFromUsedType, source, analyzedClasses);
-                if (uses) {
-                    break first;
+        final Set<ClassFile> classesFromSource = mSourceToClasses.get(source);
+        for (final ClassFile classFromSource : classesFromSource) {
+            final String typeFromClass = classFromSource.getType();
+            if (clazz.getType().equals(typeFromClass)) {
+                uses = true;
+                break;
+            }
+        }
+        if (!uses) {
+            final Set<String> usages = clazz.getUsedClasses();
+            first:
+            for (final String usedType : usages) {
+                for (final ClassFile classFromSource : classesFromSource) {
+                    final String typeFromClass = classFromSource.getType();
+                    if (usedType.equals(typeFromClass)) {
+                        uses = true;
+                        break first;
+                    }
+                    // search children
+                    final ClassFile classFromUsedType = ClassFileUtils.getFromType(usedType);
+                    uses = classUsesSource(classFromUsedType, source, analyzedClasses, tree);
+                    if (uses) {
+                        //System.out.println(classFromUsedType);
+                        break first;
+                    }
                 }
             }
+        }
+        if (uses){
+            tree.add(clazz.getType());
         }
         return uses;
     }
